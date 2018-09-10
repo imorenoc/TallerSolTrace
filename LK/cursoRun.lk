@@ -1,0 +1,203 @@
+//************************************************************
+// SolTrace 2017.7.9
+// script LK: Simulaci'on de un heli'ostato
+//************************************************************
+
+// Ruta de trabajo
+cwd("Z:/home/isaias/Documents/Escuela/PhD/Cursos/Taller_CNEER2018/SolTrace/LK");
+rut = cwd() + "/";
+
+// ****************************
+// FUNCIONES DE INTER'ES B'ASICAS
+// ****************************
+
+// suma de vectores
+sum_v = define(u,v) {
+	for(i = 0; i < 3; i++ ) w[i] = u[i] + v[i];
+    return w;};
+	
+res_v = define(u,v) {
+    for(i = 0; i < 3; i++ ) w[i] = u[i] - v[i];
+    return w;};
+
+// Calcula la norma de un vector
+norma = define(u) { return sqrt( dot(u,u) );};
+
+// Calcula el vector unitario
+unit = define(u) {
+   m = norma(u);
+   for(i = 0; i < 3; i++ ) u[i] = u[i]/m;
+   return u; };
+
+/* Calcula la normal del heliostato
+   s - vector solar
+   T - posico'on de la torre
+   H - posici'on del heli'ostato
+*/
+normal = define(s, T, H){
+    s = unit(s);
+    t = res_v(T, H);
+    t = unit(t);
+    n = sum_v(s,t);
+    return unit(n);
+};
+
+// Calcula el aimpoint del heli'ostato
+aimpoint = define(s, T, H){
+    n = normal(s,T,H);
+    ap = sum_v(H,n);
+    return ap;
+};
+
+// Irradiacia
+AM = define(ha, theta){
+	 d = cos(theta) + 0.5057*(96.080- theta)^(-1.634);
+    return exp(-0.0001184*ha)/d;
+};
+
+G = define(G0, tau, am){
+	x = am^0.678;
+	Gh = G0*tau^x;
+	return Gh;
+};
+
+// *************************
+// DATOS B'ASICOS DE ENTRADA
+// *************************
+
+// Vector solar unitario
+s[0] = 0.428720;
+s[1] = -0.897006;
+s[2] = 0.107607;
+
+// Posici'on del receptor
+T[0] = 0.0;
+T[1] = 0.0;
+T[2] = 32.0;
+
+// Dimensiones del receptor
+wr = 3.0;
+hr = 3.0;
+
+// Aimpoint del receptor
+apT[0] = 0.0;
+apT[1] = 1.0;
+apT[2] = T[2];
+
+//Heli'ostato
+H[0] = 0.0;
+H[1] = 50.0;
+H[2] = 0.0;
+
+//Dimensiones del heli'ostato
+w = 1.0;
+h = 1.0;
+
+// Calculo del aimpoint
+ap = aimpoint(s, T, H);
+
+// Calculo de irradiancia
+G0  = 1367;  // Constante solar [G0] = W/m2
+tau = 0.7;   // Transmitancia de cielo claro
+ha  = 1313;   // Altitud del lugar [ha] = m   
+
+theta = acos(s[2]);
+I = G(G0, tau, AM(ha, theta));
+outln("Irradiancia = " + I);
+
+
+// *****************
+// DATOS DE SOLTRACE
+// *****************
+
+//  Forma solar
+Sun.shape = 'g';
+Sun.sigma = 2.73;
+Sun.x = s[0];
+Sun.y = s[1];
+Sun.z = s[2];
+sunopt(Sun);
+
+//   Propiedades 'opticas
+clearoptics();
+
+addoptic('espejo');
+opticopt( 'espejo', 1, {'refl' = 1, 'trans' = 0.0001, 'errslope' = 2.64, 'errspec'=0.0001});
+
+//  Etapas
+clearstages();
+
+//  Heli'ostato
+addstage('heliostato');
+activestage('heliostato'); 
+
+addelement(); // adds element to current stage
+elementopt( 0, {'en'=true, 'x' = H[0] , 'y' = H[1], 'z' = H[2],
+	'ax' = ap[0], 'ay' = ap[1], 'az' = ap[2], 
+	'zrot'=0, 'aper'=['r',w,h,0,0,0,0,0,0],
+	'surf'=['f', 0,0,0,0,0,0,0,0],
+	'optic'='espejo'} );
+
+//  Receptor
+addstage( 'receptor' );
+activestage( 'receptor' ); 
+
+addelement(); // adds element to current stage
+elementopt( 0, {'en' = true, 'x' = T[0], 'y' = T[1], 'z' = T[2] ,
+	'ax' = apT[0], 'ay' = apT[1], 'az'= apT[2], 
+	'zrot'=0, 'aper'=['r', wr, hr,0,0,0,0,0,0],
+	'surf'=['f',0,0,0,0,0,0,0,0],
+	'optic'='espejo'} );	
+
+// Simulaci'on
+// ***********
+n =2000000; // Rayos de simulaci'on
+traceopt({ "rays" = n } );
+trace();
+
+// Elemento a exportar
+stage = 1;
+element = 0;
+nBinX = 40;
+nBinY = 40;
+DNI = I;
+
+// Exportar matriz de flujo
+fs = rut + "matriz.dat";
+file_out = open(fs, "w");
+
+// Estad'istica
+stat = elementstats( stage, element, nBinX, nBinY, DNI, false );
+da = stat.bin_size_x * stat.bin_size_y;
+
+write_line(file_out, "## Muestra el numero de rayos que golpean cada bin"); 
+flux ="";
+for (r = 0 ; r < #stat.flux ; r++){
+    for (c = 0 ; c < #stat.flux[r]; c++){
+      aux = stat.flux[c][r] * stat.power_per_ray/da;
+      flux = flux + aux + "\t";
+	}
+    write_line(file_out, flux);
+    flux = "";
+}
+close(file_out);
+
+// Exportar archivo de estad'isticas
+// ********************************
+fs = rut + "stats.dat";
+file_out = open(fs, "w");
+
+stat.flux = null;  
+stat.xvalues = null; 
+stat.yvalues = null;
+keys = @stat;
+write_line(file_out, "## Todas las estadisticas:");
+for (i = 0; i < #keys; i++)
+	write_line( file_out, "# " + keys[i] + " = " + stat{keys[i]} );
+write_line(file_out, "# ray hits on target: " + rayhits('1', '0'));
+close(file_out);
+
+//Guarda el archivo de trabajo
+//****************************
+name = "simulacion";
+save_project(rut + name + ".stinput");

@@ -1,0 +1,238 @@
+\documentclass[12pt, spanish]{article}
+
+\usepackage[activeacute]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage[T1]{fontenc}
+\spanishdecimal{.}
+
+\usepackage{amsmath, amsthm}
+\usepackage{amssymb}
+\usepackage{booktabs}
+
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+
+\newtheoremstyle{problemstyle}  % <name>
+        {3pt}                                               % <space above>
+        {3pt}                                               % <space below>
+        {\normalfont}                               % <body font>
+        {}                                                  % <indent amount}
+        {\bfseries\itshape}                 % <theorem head font>
+        {\normalfont\bfseries:}         % <punctuation after theorem head>
+        {.5em}                                          % <space after theorem head>
+        {}                                                  % <theorem head spec (can be left empty, meaning `normal')>
+\theoremstyle{problemstyle}
+
+\newtheorem{problem}{Problema}[section] % Comment out [section] to remove section number dependence
+
+\newcommand\TheSolution{\textbf{Solución:}}
+\newcommand\ASolution{\textbf{SolTrace:}}
+
+
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstset{ 
+  backgroundcolor=\color{white},
+  basicstyle=\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  commentstyle=\color{mygreen},
+  deletekeywords={...},
+  escapeinside={\%*}{*)},
+  extendedchars=true,
+  frame=single,
+  keepspaces=true,
+  keywordstyle=\color{red},
+  language=C,
+  morekeywords={*,cwd, define, sunopt, clearopticss, addoptic, opticopt, clearstages, addstage, addelement, activestage, asselement, elementopt, traceopt, trace, elementstats, write_line, open, close, save_project, cos, exp, acos, outln},
+  numbers=left,
+  numbersep=5pt,
+  numberstyle=\tiny\color{mygray},
+  rulecolor=\color{black},
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  stepnumber=2,
+  stringstyle=\color{mymauve},
+  tabsize=2,
+  title=\lstname
+}
+
+
+\author{Isaías Moreno Cruz}
+\title{Curso de SolTrace}
+
+\begin{document}
+\maketitle
+
+
+\section{Introducción}
+\label{sec:rayos}
+
+Una forma de cálcular la irradiancia solar concentrada es la simulación de \emph{trazado de rayos}, el cual se puede llevar a cabo mediante dos métodos:
+
+\begin{itemize}[noitemsep]
+  \item El método de \emph{Monte Carlo}, basado en rayos al azar (método estadístico)
+  \item El método de \emph{Convolución}, basado en la convolución de distribuciones.
+\end{itemize}
+
+El método de Monte Carlo usa rayos al azar que vienen de una superficie, y luego determina cuales de ellos llegan a una segunda superficie. La irradiancia sobre una superficie elemental es proporcional al número de impactos de rayos. En el caso de un concentrador con una reflexión, este algoritmo es usado dos veces, primero entre el Sol y la superficie reflectiva con una distribución energética correspondiente de la forma del sol, después entre la faceta del helióstato y el receptor con las leyes estadísticas del error de distribución relacionado con los defectos de las facetas. La precisión y el tiempo de cálculo aumentan con el número de rayos y la complejidad de la geometría. En el método de convolución (o cono óptico), los rayos reflejados de los espejos elementales  son considerados con un cono de error calculado por la convolución de la distribución normal Gausiana correspondiente a cada error (forma del Sol y los errores del helióstato). Una comparación sistemática muestra que se obtienen resultados muy similares con ambos métodos de trazo de rayos, aunque el Método de Monte Carlo  es más versátiles \citep{Garcia2008codes}.
+
+
+\section{SolTrace}
+\label{sec:soltrace}
+
+\textbf{SolTrace} es un software que utiliza el trazado de rayos por el método de Monte Carlo, desarrollado por el \href{https://www.nrel.gov/csp/soltrace.html}{NREL}, que puede usarse para analizar y diseñar sistemas ópticos de potencia de energía solar. El cual puede ser adaptado a las principales tecnologías de conversión de energía térmica solar a electricidad y también a hornos solares. El sistema óptico esta organizado en etapas en un sistema de coordenadas globales: las etapas son secciones de la geometría óptica que exitosamente es golpeada por los rayos en su trayectoria del sol a el receptor final. Las etapas pueden ser ópticas (interacción física con los rayos) o virtuales (usadas para determinar la posición de los rayos o el mapa de flujo en cualquier parte del sistema sin interacción con él). Estas etapas estan compuestas de elementos con su propia apertura, forma, y propiedades ópticas (errores ópticos, error de especularidad, refletividad, transmitividad, y reflacción). Cada elemento esta descrito en un sistema coordinado asociado con su etapa. A diferencia de las otras herramientas, atenuación atmosférica y errores de seguimiento no se incluyen directamente pero pueden ser tomadas en cuenta, respectivamente, en la reflectivilidad del espejo o en su error de pendiente \citep{Wendelin2013soltrace}. Los resultados pueden ser mostrados y guardados como gráficas, mapas de flujo y gráficas de desempeño, además de tener una interface amigable con el usuario.
+
+
+La Figura~\ref{fig:indice} muestra las etapas necesarias para relizar una simulación en SolTrace, es decir:
+
+\begin{itemize}[noitemsep]
+\item \emph{Sun Shape}
+\item \emph{Optical Properties}
+\item \emph{System Stages}
+\item \emph{Trace Options}
+\item \emph{Results}
+\end{itemize}
+
+\subsection{Forma Solar}
+\label{subsec:forma}
+
+En el apartado de la forma solar (\emph{sun shape}) podemos indicar la \textbf{dirección del vector solar} mediante \emph{coordenadas globales}, que identificaremos como $\hat s$, o al ingresar los parámetros de \emph{latitud, día y hora}.
+
+En el caso de que nosotros ingresemos el vector solar $\hat s$, nos permite definir nuestro sistema de referencia, es decir, que $x$, $y$ y $z$ estarán referenciadas según nuestro propio interés. En este caso, y para todo el presente manual, los sistemas de referencia serán $x$ hacia el este, $y$ hacia el norte y $z$ hacia el cenit. Cuando ingresamos la latitud, el día y la hora entonces el sistema de referencia estará dado por el sistema global de SolTrace que considera $x$ hacia el oeste, $z$ hacia el norte y $y$ hacia el cenit.
+
+Una vez que se haya indicado la dirección del vector solar hay que indicar la forma solar. La forma solar es la distribución de intensidad de los rayos solares que llegan a la siperficie de la Tierra como función de su ángulo con respecto al centro del disco solar. Esta forma no es constante en el tiempo y tampoco es independiente de la localización geográfica, ya que se ve afectada por las condiciones climáticas. Existen diferentes formas solares: el sol uniforme (\emph{pillbox}), el sol Gaussiano, y el sol real~\citep{Buie2003sunshape}. 
+
+\begin{figure}[h!]
+  \centering
+  \subfigure[]{
+    \includegraphics[width=0.315\textwidth]{figures/SolTrace}\label{fig:indice}}
+  \subfigure[]{
+  \includegraphics[width=0.5\textwidth]{figures/sunshape}\label{fig:forma}}
+  \caption{\label{fig:soltrace} Del lado izquierdo se muestrea el indice del programa de SolTrace y del izquierdo las opciones para definir la forma solar.}
+\end{figure}
+
+\section{Propiedades ópticas}
+\label{sec:opticas}
+
+En un concentrador solar, varios factores estadísticos independientes contribuyen al error óptico: errores de pendiente\footnote{El error de pendiente engloba los errores macroscópicos.}, ausencia de la especularidad ideal, errores de seguimiento, deformaciones y desplazamientos del receptor.
+
+Se considera generalmente que los errores pueden ser representados adecuadamente por distribuciones de probabilidad Gaussiana \citep{Pettit1977characterization}. El error global es una combinación de los diferentes errores y su dispersión estándar es una combinación en cuadratura de los errores individuales, Ec.\ref{eq:errores}.
+
+\begin{equation}
+  \label{eq:errores}
+  \sigma_{\text{\'optica}}^2 = \sigma_{\text{especular}}^2 + 4\sigma_{\text{pendiente}}^2 + \sigma_{\text{seguimiento}}^2
+\end{equation}
+$\sigma_{\text{pendiente}}$ es multiplocado por 2 debido a la ley de Snell; en reflectores Fresnel $\sigma_{\text{seguimiento}}$ debe ser también multiplicada por 2.
+
+El ancho total del rayo $\sigma_{\text{total}}$ es obtenida al agregar el semi-ángulo del disco solar.
+
+\begin{equation}
+  \label{eq:total}
+  \sigma_{\text{total}}^2 = \sigma_{\text{\'optica}}^2 + \sigma_{\text{sol}}^2
+\end{equation}
+
+En la sección de propiedades ópticas (\emph{Optical Properties}) del índice principal del programa podemos definir las propiedades ópticas de nuestros materiales a utilizar.
+
+\begin{itemize}[noitemsep]
+\item Reflectancia
+\item Transmitancia
+\item Error de pendiente
+\item Error especular
+\item Tipo de error
+\end{itemize}
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/optica}
+  \caption{\label{fig:optica} Propiedades ópticas.}
+\end{figure}
+
+Las propiedades ópticas dependerán del material del concentrador y del receptor que estemos utilizando.
+
+\section{Etapas del trazado de rayos}
+\label{sec:etapas}
+
+Es en esta sección donde podemos definir las características de nuestro concentrador y del receptor. Es posible definir más de una etapa, pero estas etapas deben de ser subsecuentes. En la sección de etapas podemos distingir tres apartados. El primero de ellos es \emph{Stage Properties} en donde podemos asignar un nombre a la etapa y en donde esta seleccionada la etapa \emph{Multiple hits per ray} que nos indica que en esa etapa el rayo puede incidir varias veces; la opción \emph{Virtual stage} es utilizada cuando se desea saber que esta ocurriendo en una intervalo ente el concentrador y el receptor pero sin afectar la trayectoria de los rayos. Otra sección es \emph{Global Coordinates}, puede ser utilizada para generar sistemas de referencia locales. En sección de \emph{Element Editing} podemos definir los elementos que estrán interactuando en el trazado de rayos, condentradores o receptores.
+
+\begin{itemize}[noitemsep]
+\item \emph{Insert}. Puedes incentar elementos necesarios para la simulación
+\item \emph{Append}. Te permite agregar elementos
+\item \emph{Delete}. Como su nombre lo indica, puedes eliminar elementos
+\end{itemize}
+
+Una vez que agregas los elementos deseados pudes ir modificando las propiedades de cada uno de ellos. Indicando su posición ($x$, $y$, $z$), su \emph{Aimpoint} (ver \ref{subsec:aimpoint}), la apertura, el tipo de superficie, la intereacción del elemento y sus propiedades ópticas.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=1.0\textwidth]{figures/stage}
+  \caption{\label{fig:etapa} Característica de las etapas.}
+\end{figure}
+
+Los tipos de aperturas y superficies que pueden ser utilizadas, se muestran en la Figura~\ref{fig:elementos}. A las cuales podemos ingresar al seleccionar el botón de \emph{Aperture} o \emph{Surface}, respectivamente.
+
+\begin{figure}[ht]
+  \centering
+  \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figures/apertura}}
+  \subfigure[]{
+    \includegraphics[width=0.455\textwidth]{figures/superficie}}
+  \caption{\label{fig:elementos} Tipos de apertura,a la izquierda, y de superficie, a la derecha.}
+\end{figure}
+
+\subsection{Aimpoint}
+\label{subsec:aimpoint}
+
+El \emph{aimpoint} es un vector que define SolTraces y nos indica la orientación de una superficie. Considerese la Figura~\ref{fig:aimpoint} en donde se muestra una superficie plana en donde incide el vetor solar $\hat s$ el cual es reflejado con una dirección $\hat r$ que incide en el objetivo deseado; se definen adicionalmente los vectores $\vec R_F$ y $\vec R_T$ que son los vectores que van desde el origen de las coordenadas globales a la superficies y al objetivo, respectivamente. La orientación de dicha superficie esta definida por su \emph{aimpoint} que es un vector que va desde el origen a cualquier punto del vector normal $\hat n$ de la superficie. El \emph{aimpoint} es la suma de los vectores $\vec R_F$ y $\vec n$. Hay que hacer notar que si nuestra superficie esta en el origen el \emph{aimpoint} coincidirá con la  dirección del vector normal, dado que $\vec R_F$ es cero. Pero para las demás superficies que se encuentran fuera del origen el $\vec R_F$ es diferente de cero. Como lo muestra la Figura~\ref{fig:aimpoint} el \emph{aimpoint} de una superficie fuera del origen esta dado por la Ec.~\ref{ec:aimpoint}
+
+\begin{equation} \label{ec:n}
+  \hat n = \dfrac{\hat s + \hat r}{\Vert \hat s + \hat r \Vert}
+\end{equation}
+
+\begin{equation} \label{ec:aimpoint}
+  \vec a = \vec R_F + \hat n 
+\end{equation}
+
+
+
+\begin{figure}[h!]
+  \centering
+  \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figures/aimpoint01}\label{fig:base}}
+  \subfigure[]{
+    \includegraphics[width=0.45\textwidth]{figures/aimpoint02}\label{fig:igAim}}
+  \caption{\label{fig:aimpoint} Definición de \emph{aimpoint}.}
+\end{figure}
+
+
+\section{Trazado de rayos}
+\label{sec:trazado}
+
+Una vez que se han definido las diferentes secciones de los elementos se procede a realizar la simulación de trazado de rayos, para lo cual es necesario indicar el número de rayos para la interacción, hay que recordar que SolTrace utiliza el método de Monte Carlo, y dado que se trata de un método estadístico, entre más rayos se utilicen el resultado obtenido será más preciso. Usualmente se selecciona un número de rayos pequeño, e.g., un millón es un buen número para iniciar, y corregir tus posibles errores, sin embargo es necesario realizar un analísis de independencia de malla para conocer el número óptimo de rayos necesarios para nuestra simulación.
+
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/raytrace}
+  \caption{\label{fig:trazado} Opciones de trazado de rayos.}
+\end{figure}
+
+\input{platoParabolico}
+\input{canalParabolico}
+\input{heliostato}
+\input{scripting}
+
+
+\bibliographystyle{plain}
+\bibliography{taller}
+
+\end{document}
